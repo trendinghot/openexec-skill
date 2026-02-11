@@ -28,6 +28,26 @@ It executes work **only after** governance approval has been granted elsewhere.
 
 ---
 
+## Example: Governed execution request
+
+Below is a simplified example of how a structured execution might flow through the system.
+
+### 1. Agent proposes action
+
+```json
+{
+  "action": "send_email",
+  "parameters": {
+    "to": "user@example.com",
+    "subject": "Welcome",
+    "body": "Your account has been created."
+  },
+  "requested_by": "agent-42",
+  "timestamp": "2026-02-10T19:22:00Z"
+}
+
+---
+
 ## Why this model matters
 
 Most agent systems fail silently:
