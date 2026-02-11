@@ -110,7 +110,7 @@ They are **safety boundaries**.
 This skill is one layer of a three-layer governed execution system:
 
 - **OpenExec** — deterministic execution engine  
-  https://github.com/trendinghot/openclaw  
+  https://github.com/trendinghot/openexec  
 
 - **ClawShield** — governance and approval gate  
   https://github.com/trendinghot/clawshield  
