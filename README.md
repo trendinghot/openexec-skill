@@ -98,6 +98,7 @@ Run:
 python -m uvicorn main:app --host 127.0.0.1 --port 5000
 ```
 
+By default, bind to `127.0.0.1` unless intentionally deploying behind a firewall or reverse proxy.
 Production deployments may override host binding explicitly (e.g., `--host 0.0.0.0`).
 
 Confirm health:
@@ -205,6 +206,23 @@ In ClawShield mode:
 - The execution layer never contacts the governance service during runtime
 
 This preserves execution determinism and prevents network-induced variability.
+
+---
+
+## Installation Model
+
+OpenExec is a source-distributed Python service.
+It does not install system-wide binaries or modify the host environment.
+
+Installation consists of:
+
+1. Installing pinned Python dependencies (`pip install -r requirements.txt`)
+2. Running the FastAPI application via uvicorn
+3. Optionally configuring environment variables
+
+No dynamic downloads or runtime package installation occur.
+
+All dependencies are pinned in `requirements.txt` for reproducible builds.
 
 ---
 

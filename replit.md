@@ -1,7 +1,7 @@
 # OpenExec Skill
 
 ## Overview
-OpenExec is a deterministic execution engine requiring external governance approval. It runs as a FastAPI service with SQLite storage, replay protection, receipt verification, Ed25519 constitutional signature enforcement, and optional execution allow-list. Version 0.1.6.
+OpenExec is a deterministic execution engine requiring external governance approval. It runs as a FastAPI service with SQLite storage, replay protection, receipt verification, Ed25519 constitutional signature enforcement, and optional execution allow-list. Version 0.1.7.
 
 ## Recent Changes
 - 2026-02-17: Upgraded to Ed25519 signature verification (from HMAC-SHA256)
