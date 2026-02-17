@@ -1,11 +1,11 @@
 ---
 name: OpenExec
 slug: openexec
-version: 0.1.4
+version: 0.1.6
 category: infrastructure/governance/execution
 runtime: python
 entrypoint: main:app
-requires_network: false
+requires_network: false  # No outbound HTTP/RPC calls during execution. Inbound HTTP only.
 modes:
   - demo
   - clawshield

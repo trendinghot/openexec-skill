@@ -95,8 +95,10 @@ pip install -r requirements.txt
 Run:
 
 ```bash
-python -m uvicorn main:app --host 0.0.0.0 --port 5000
+python -m uvicorn main:app --host 127.0.0.1 --port 5000
 ```
+
+Production deployments may override host binding explicitly (e.g., `--host 0.0.0.0`).
 
 Confirm health:
 
@@ -361,6 +363,38 @@ For high-risk environments, deploy OpenExec inside:
 Infrastructure isolation is a separate concern from execution authorization.
 
 This separation is deliberate.
+
+---
+
+## Execution Privilege Model
+
+OpenExec does not sandbox OS-level execution.
+Handlers execute with the privileges of the hosting process.
+
+Operators must:
+
+- Restrict allowed actions via `OPENEXEC_ALLOWED_ACTIONS`
+- Deploy inside a container or VM for high-risk workloads
+- Avoid running the service as root
+- Bind to localhost unless intentionally exposed to a network
+
+These constraints are operational requirements, not optional recommendations.
+
+---
+
+## Network Isolation Model
+
+OpenExec does not initiate outbound HTTP, RPC, or governance calls during execution.
+
+Inbound HTTP is used solely to receive execution proposals.
+
+Outbound network I/O occurs only if:
+
+- The operator explicitly configures `OPENEXEC_DB_URL` to point to a remote database.
+
+Signature verification is performed locally using a pre-loaded public key.
+
+No external policy engine calls occur at runtime.
 
 ---
 
