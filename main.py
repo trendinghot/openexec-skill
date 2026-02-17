@@ -1,10 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from openexec.models import ExecutionRequest
+from openexec.engine import execute
+from openexec.db import init_db
 import os
 import datetime
 
-app = FastAPI()
-
 VERSION = "0.1.0"
+
+@asynccontextmanager
+async def lifespan(application):
+    init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def root():
@@ -27,3 +36,8 @@ def version():
 @app.get("/ready")
 def ready():
     return {"ready": True}
+
+@app.post("/execute")
+def execute_action(request: ExecutionRequest):
+    result = execute(request)
+    return result.model_dump()
