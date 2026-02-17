@@ -1,34 +1,50 @@
 """
 ClawShield integration client.
 
-Provides artifact minting for testing and future remote governance calls.
+Provides Ed25519-signed artifact minting for testing.
+In production, ClawShield mints these artifacts externally.
 """
 
-import os
 import uuid
+import base64
 import datetime
-from openexec.crypto import canonical_hash, sign_message
+from openexec.crypto import canonical_hash
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-CLAWSHIELD_BASE_URL = os.getenv("CLAWSHIELD_BASE_URL", "")
-CLAWSHIELD_API_KEY = os.getenv("CLAWSHIELD_API_KEY", "")
-CLAWSHIELD_TENANT_ID = os.getenv("CLAWSHIELD_TENANT_ID", "")
-CLAWSHIELD_SECRET_KEY = os.getenv("CLAWSHIELD_SECRET_KEY", "")
+def generate_test_keypair():
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    public_key_pem = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
+    return private_key, public_key_pem
 
-def mint_approval_artifact(action_request: dict, tenant_id: str = "", secret_key: str = "") -> dict:
-    tenant = tenant_id or CLAWSHIELD_TENANT_ID
-    secret = secret_key or CLAWSHIELD_SECRET_KEY
+def mint_approval_artifact(
+    action_request: dict,
+    private_key: Ed25519PrivateKey,
+    tenant_id: str,
+    ttl_seconds: int = 300
+) -> dict:
     approval_id = str(uuid.uuid4())
     action_hash = canonical_hash(action_request)
     issued_at = datetime.datetime.utcnow().isoformat()
+    expires_at = (datetime.datetime.utcnow() + datetime.timedelta(seconds=ttl_seconds)).isoformat()
 
-    message = f"{approval_id}:{action_hash}:{tenant}:{issued_at}"
-    signature = sign_message(secret, message)
+    message = (
+        approval_id
+        + tenant_id
+        + action_hash
+        + issued_at
+        + expires_at
+    ).encode()
+
+    signature = private_key.sign(message)
+    signature_b64 = base64.b64encode(signature).decode()
 
     return {
         "approval_id": approval_id,
+        "tenant_id": tenant_id,
         "action_hash": action_hash,
-        "signature": signature,
-        "issued_by": "clawshield",
         "issued_at": issued_at,
-        "tenant_id": tenant
+        "expires_at": expires_at,
+        "signature": signature_b64
     }

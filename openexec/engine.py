@@ -34,7 +34,7 @@ def execute(request: ExecutionRequest) -> ExecutionResult:
             validate_approval(action_request, request.approval_artifact.model_dump())
             approved = True
         else:
-            raise ValueError(f"Unknown mode")
+            raise ValueError("Unknown mode")
 
         result = handler(payload)
         exec_id = str(uuid.uuid4())

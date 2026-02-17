@@ -3,23 +3,26 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
+import datetime
+import base64
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
 from openexec.db import init_db
-from openexec.crypto import canonical_hash, sign_message, verify_signature
-from openexec.clawshield_client import mint_approval_artifact
+from openexec.crypto import canonical_hash, verify_ed25519_signature
+from openexec.clawshield_client import generate_test_keypair, mint_approval_artifact
 
-TEST_SECRET = "test-secret-key-for-constitutional"
 TEST_TENANT = "tenant-001"
 
 init_db()
 
 client = TestClient(app)
 
-def _make_artifact(action, payload=None):
+PRIVATE_KEY, PUBLIC_KEY_PEM = generate_test_keypair()
+
+def _make_artifact(action, payload=None, ttl_seconds=300):
     action_request = {"action": action, "payload": payload or {}}
-    return mint_approval_artifact(action_request, tenant_id=TEST_TENANT, secret_key=TEST_SECRET)
+    return mint_approval_artifact(action_request, PRIVATE_KEY, TEST_TENANT, ttl_seconds=ttl_seconds)
 
 class TestCrypto(unittest.TestCase):
     def test_canonical_hash_deterministic(self):
@@ -28,33 +31,38 @@ class TestCrypto(unittest.TestCase):
         h2 = canonical_hash({"a": 1, "b": 2})
         self.assertEqual(h1, h2)
 
-    def test_sign_and_verify(self):
-        msg = "test-message"
-        sig = sign_message("secret", msg)
-        self.assertTrue(verify_signature("secret", msg, sig))
+    def test_ed25519_sign_and_verify(self):
+        message = b"test-message"
+        signature = PRIVATE_KEY.sign(message)
+        sig_b64 = base64.b64encode(signature).decode()
+        self.assertTrue(verify_ed25519_signature(PUBLIC_KEY_PEM, message, sig_b64))
 
-    def test_verify_rejects_wrong_key(self):
-        msg = "test-message"
-        sig = sign_message("secret", msg)
-        self.assertFalse(verify_signature("wrong-key", msg, sig))
+    def test_ed25519_rejects_wrong_key(self):
+        _, other_pub_pem = generate_test_keypair()
+        message = b"test-message"
+        signature = PRIVATE_KEY.sign(message)
+        sig_b64 = base64.b64encode(signature).decode()
+        self.assertFalse(verify_ed25519_signature(other_pub_pem, message, sig_b64))
 
-    def test_verify_rejects_tampered_message(self):
-        msg = "test-message"
-        sig = sign_message("secret", msg)
-        self.assertFalse(verify_signature("secret", "tampered", sig))
+    def test_ed25519_rejects_tampered_message(self):
+        message = b"test-message"
+        signature = PRIVATE_KEY.sign(message)
+        sig_b64 = base64.b64encode(signature).decode()
+        self.assertFalse(verify_ed25519_signature(PUBLIC_KEY_PEM, b"tampered", sig_b64))
 
 class TestApprovalMinting(unittest.TestCase):
     def test_mint_produces_valid_artifact(self):
         action_request = {"action": "echo", "payload": {"msg": "hello"}}
-        artifact = mint_approval_artifact(action_request, TEST_TENANT, TEST_SECRET)
-        self.assertEqual(artifact["issued_by"], "clawshield")
+        artifact = mint_approval_artifact(action_request, PRIVATE_KEY, TEST_TENANT)
         self.assertEqual(artifact["tenant_id"], TEST_TENANT)
         self.assertEqual(artifact["action_hash"], canonical_hash(action_request))
+        self.assertIn("expires_at", artifact)
+        self.assertIn("signature", artifact)
 
 class TestConstitutionalExecution(unittest.TestCase):
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
+        "CLAWSHIELD_PUBLIC_KEY": PUBLIC_KEY_PEM,
         "CLAWSHIELD_TENANT_ID": TEST_TENANT,
     })
     def test_valid_artifact_executes(self):
@@ -62,7 +70,7 @@ class TestConstitutionalExecution(unittest.TestCase):
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "constitutional"},
-            "nonce": "const-valid-1",
+            "nonce": "ed25519-valid-1",
             "approval_artifact": artifact
         })
         self.assertEqual(resp.status_code, 200)
@@ -72,20 +80,20 @@ class TestConstitutionalExecution(unittest.TestCase):
 
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
+        "CLAWSHIELD_PUBLIC_KEY": PUBLIC_KEY_PEM,
         "CLAWSHIELD_TENANT_ID": TEST_TENANT,
     })
     def test_missing_artifact_rejected(self):
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "no-artifact"},
-            "nonce": "const-missing-1"
+            "nonce": "ed25519-missing-1"
         })
         self.assertEqual(resp.status_code, 403)
 
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
+        "CLAWSHIELD_PUBLIC_KEY": PUBLIC_KEY_PEM,
         "CLAWSHIELD_TENANT_ID": TEST_TENANT,
     })
     def test_tampered_payload_rejected(self):
@@ -93,7 +101,7 @@ class TestConstitutionalExecution(unittest.TestCase):
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "tampered"},
-            "nonce": "const-tamper-1",
+            "nonce": "ed25519-tamper-1",
             "approval_artifact": artifact
         })
         self.assertEqual(resp.status_code, 403)
@@ -101,7 +109,7 @@ class TestConstitutionalExecution(unittest.TestCase):
 
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
+        "CLAWSHIELD_PUBLIC_KEY": PUBLIC_KEY_PEM,
         "CLAWSHIELD_TENANT_ID": "wrong-tenant",
     })
     def test_tenant_mismatch_rejected(self):
@@ -109,7 +117,7 @@ class TestConstitutionalExecution(unittest.TestCase):
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "hello"},
-            "nonce": "const-tenant-1",
+            "nonce": "ed25519-tenant-1",
             "approval_artifact": artifact
         })
         self.assertEqual(resp.status_code, 403)
@@ -117,15 +125,30 @@ class TestConstitutionalExecution(unittest.TestCase):
 
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": "wrong-secret",
         "CLAWSHIELD_TENANT_ID": TEST_TENANT,
     })
-    def test_bad_signature_rejected(self):
+    def test_missing_public_key_rejected(self):
         artifact = _make_artifact("echo", {"msg": "hello"})
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "hello"},
-            "nonce": "const-badsig-1",
+            "nonce": "ed25519-nokey-1",
+            "approval_artifact": artifact
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn("CLAWSHIELD_PUBLIC_KEY not configured", resp.json()["detail"])
+
+    @patch.dict(os.environ, {
+        "OPENEXEC_MODE": "clawshield",
+        "CLAWSHIELD_PUBLIC_KEY": generate_test_keypair()[1],
+        "CLAWSHIELD_TENANT_ID": TEST_TENANT,
+    })
+    def test_wrong_public_key_rejected(self):
+        artifact = _make_artifact("echo", {"msg": "hello"})
+        resp = client.post("/execute", json={
+            "action": "echo",
+            "payload": {"msg": "hello"},
+            "nonce": "ed25519-wrongkey-1",
             "approval_artifact": artifact
         })
         self.assertEqual(resp.status_code, 403)
@@ -133,59 +156,34 @@ class TestConstitutionalExecution(unittest.TestCase):
 
     @patch.dict(os.environ, {
         "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
-        "CLAWSHIELD_TENANT_ID": TEST_TENANT,
-    })
-    def test_bad_issuer_rejected(self):
-        artifact = _make_artifact("echo", {"msg": "hello"})
-        artifact["issued_by"] = "not-clawshield"
-        resp = client.post("/execute", json={
-            "action": "echo",
-            "payload": {"msg": "hello"},
-            "nonce": "const-issuer-1",
-            "approval_artifact": artifact
-        })
-        self.assertEqual(resp.status_code, 403)
-        self.assertIn("Unknown issuer", resp.json()["detail"])
-
-    @patch.dict(os.environ, {
-        "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": TEST_SECRET,
+        "CLAWSHIELD_PUBLIC_KEY": PUBLIC_KEY_PEM,
         "CLAWSHIELD_TENANT_ID": TEST_TENANT,
     })
     def test_expired_artifact_rejected(self):
-        import datetime as dt
-        artifact = _make_artifact("echo", {"msg": "hello"})
-        old_time = (dt.datetime.utcnow() - dt.timedelta(minutes=10)).isoformat()
-        action_request = {"action": "echo", "payload": {"msg": "hello"}}
-        action_hash = canonical_hash(action_request)
-        message = f"{artifact['approval_id']}:{action_hash}:{TEST_TENANT}:{old_time}"
-        artifact["issued_at"] = old_time
-        artifact["signature"] = sign_message(TEST_SECRET, message)
+        artifact = _make_artifact("echo", {"msg": "hello"}, ttl_seconds=-60)
         resp = client.post("/execute", json={
             "action": "echo",
             "payload": {"msg": "hello"},
-            "nonce": "const-expired-1",
+            "nonce": "ed25519-expired-1",
             "approval_artifact": artifact
         })
         self.assertEqual(resp.status_code, 403)
         self.assertIn("expired", resp.json()["detail"])
 
-    @patch.dict(os.environ, {
-        "OPENEXEC_MODE": "clawshield",
-        "CLAWSHIELD_SECRET_KEY": "",
-        "CLAWSHIELD_TENANT_ID": TEST_TENANT,
-    })
-    def test_missing_secret_key_rejected(self):
-        artifact = _make_artifact("echo", {"msg": "hello"})
-        resp = client.post("/execute", json={
-            "action": "echo",
-            "payload": {"msg": "hello"},
-            "nonce": "const-nokey-1",
-            "approval_artifact": artifact
-        })
-        self.assertEqual(resp.status_code, 403)
-        self.assertIn("CLAWSHIELD_SECRET_KEY not configured", resp.json()["detail"])
+class TestHealthEndpoint(unittest.TestCase):
+    @patch.dict(os.environ, {"OPENEXEC_MODE": "clawshield"})
+    def test_health_clawshield_mode(self):
+        resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["mode"], "clawshield")
+        self.assertEqual(data["signature_verification"], "enabled")
+
+    @patch.dict(os.environ, {"OPENEXEC_MODE": "demo"})
+    def test_health_demo_mode(self):
+        resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["mode"], "demo")
+        self.assertEqual(data["signature_verification"], "disabled")
 
 if __name__ == "__main__":
     unittest.main()

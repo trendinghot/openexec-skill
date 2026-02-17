@@ -7,7 +7,7 @@ from openexec.db import init_db
 import os
 import datetime
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 @asynccontextmanager
 async def lifespan(application):
@@ -22,7 +22,9 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "mode": os.getenv("OPENEXEC_MODE", "demo")}
+    mode = os.getenv("OPENEXEC_MODE", "demo")
+    sig_status = "enabled" if mode == "clawshield" else "disabled"
+    return {"status": "healthy", "mode": mode, "signature_verification": sig_status}
 
 @app.get("/version")
 def version():

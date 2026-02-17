@@ -1,41 +1,42 @@
 import os
 import datetime
-from openexec.crypto import canonical_hash, verify_signature
+from openexec.crypto import canonical_hash, verify_ed25519_signature
 
 class ApprovalError(Exception):
     pass
 
-def validate_approval(action_request: dict, artifact: dict) -> bool:
+def validate_approval(action_request: dict, artifact: dict) -> None:
     request_hash = canonical_hash(action_request)
-
     if artifact.get("action_hash") != request_hash:
         raise ApprovalError("Action hash mismatch: approval does not match this request")
 
-    signature = artifact.get("signature", "")
-    message = f"{artifact['approval_id']}:{artifact['action_hash']}:{artifact['tenant_id']}:{artifact['issued_at']}"
-    secret = os.getenv("CLAWSHIELD_SECRET_KEY", "")
+    expires_at = artifact.get("expires_at", "")
+    if expires_at:
+        try:
+            expiry_time = datetime.datetime.fromisoformat(expires_at)
+            if expiry_time < datetime.datetime.utcnow():
+                raise ApprovalError("Approval artifact expired")
+        except ValueError:
+            raise ApprovalError("Invalid expires_at timestamp")
+    else:
+        raise ApprovalError("Missing expires_at in approval artifact")
 
-    if not secret:
-        raise ApprovalError("CLAWSHIELD_SECRET_KEY not configured")
+    message = (
+        artifact["approval_id"]
+        + artifact["tenant_id"]
+        + artifact["action_hash"]
+        + artifact["issued_at"]
+        + artifact["expires_at"]
+    ).encode()
 
-    if not verify_signature(secret, message, signature):
+    public_key_pem = os.getenv("CLAWSHIELD_PUBLIC_KEY", "")
+    if not public_key_pem:
+        raise ApprovalError("CLAWSHIELD_PUBLIC_KEY not configured")
+
+    signature_b64 = artifact.get("signature", "")
+    if not verify_ed25519_signature(public_key_pem, message, signature_b64):
         raise ApprovalError("Invalid signature: approval artifact is not authentic")
 
     expected_tenant = os.getenv("CLAWSHIELD_TENANT_ID", "")
     if expected_tenant and artifact.get("tenant_id") != expected_tenant:
         raise ApprovalError(f"Tenant mismatch: expected {expected_tenant}, got {artifact.get('tenant_id')}")
-
-    if artifact.get("issued_by") != "clawshield":
-        raise ApprovalError(f"Unknown issuer: {artifact.get('issued_by')}")
-
-    issued_at = artifact.get("issued_at", "")
-    if issued_at:
-        try:
-            issued_time = datetime.datetime.fromisoformat(issued_at)
-            age = datetime.datetime.utcnow() - issued_time
-            if age.total_seconds() > 300:
-                raise ApprovalError("Approval artifact expired (older than 5 minutes)")
-        except ValueError:
-            raise ApprovalError("Invalid issued_at timestamp")
-
-    return True

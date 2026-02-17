@@ -3,11 +3,11 @@ from typing import Optional
 
 class ApprovalArtifact(BaseModel):
     approval_id: str
-    action_hash: str
-    signature: str
-    issued_by: str = "clawshield"
-    issued_at: str
     tenant_id: str
+    action_hash: str
+    issued_at: str
+    expires_at: str
+    signature: str
 
 class ExecutionRequest(BaseModel):
     action: str

@@ -1,17 +1,20 @@
 # OpenExec Skill
 
 ## Overview
-OpenExec is a deterministic execution engine requiring external governance approval. It runs as a FastAPI service with SQLite storage, replay protection, receipt verification, and constitutional signature enforcement. Version 0.2.0.
+OpenExec is a deterministic execution engine requiring external governance approval. It runs as a FastAPI service with SQLite storage, replay protection, receipt verification, and Ed25519 constitutional signature enforcement. Version 0.3.0.
 
 ## Recent Changes
-- 2026-02-17: Added constitutional layer -- signed approval artifact validation with HMAC-SHA256
-- 2026-02-17: Added crypto.py, approval_validator.py, test_constitutional.py
-- 2026-02-17: Updated engine.py to enforce signature validation in clawshield mode
-- 2026-02-17: Settings and approval_validator read env vars at call time (not import time)
+- 2026-02-17: Upgraded to Ed25519 signature verification (from HMAC-SHA256)
+- 2026-02-17: Added expires_at field to approval artifacts (replacing TTL-based expiry)
+- 2026-02-17: Updated crypto.py to use cryptography library for Ed25519
+- 2026-02-17: Added cryptography dependency to requirements.txt
+- 2026-02-17: Updated clawshield_client.py with Ed25519 keypair generation and artifact minting
+- 2026-02-17: Updated /health endpoint to show signature_verification status
+- 2026-02-17: 20 tests total (6 demo + 14 constitutional)
 - 2026-02-17: Initial project creation with full runtime surface
 
 ## Architecture
-- **Runtime**: Python 3.11, FastAPI, SQLAlchemy, Pydantic
+- **Runtime**: Python 3.11, FastAPI, SQLAlchemy, Pydantic, cryptography
 - **Database**: SQLite (openexec.db)
 - **Entrypoint**: main.py (uvicorn on port 5000)
 - **Deployment**: Autoscale on Replit
@@ -20,23 +23,29 @@ OpenExec is a deterministic execution engine requiring external governance appro
 - `main.py` -- FastAPI app with /health, /ready, /version, /execute endpoints
 - `openexec/settings.py` -- Mode configuration (demo vs clawshield), reads env at call time
 - `openexec/engine.py` -- Execution engine with replay protection and constitutional enforcement
-- `openexec/crypto.py` -- HMAC-SHA256 canonical hashing, signing, verification
-- `openexec/approval_validator.py` -- Approval artifact validation (hash, signature, tenant, expiry)
-- `openexec/clawshield_client.py` -- Approval artifact minting
+- `openexec/crypto.py` -- Ed25519 signature verification, canonical SHA-256 hashing
+- `openexec/approval_validator.py` -- Approval artifact validation (hash, expiry, signature, tenant)
+- `openexec/clawshield_client.py` -- Ed25519 keypair generation and artifact minting (for testing)
 - `openexec/registry.py` -- Action registry with demo actions (echo, add)
 - `openexec/db.py` -- SQLAlchemy database setup
 - `openexec/tables.py` -- ExecutionLog table
-- `openexec/models.py` -- Pydantic schemas including ApprovalArtifact
+- `openexec/models.py` -- Pydantic schemas including ApprovalArtifact with expires_at
 - `openexec/receipts.py` -- SHA-256 receipt verification
 - `tests/test_demo_flow.py` -- Demo mode test suite (6 tests)
-- `tests/test_constitutional.py` -- Constitutional mode test suite (10 tests)
+- `tests/test_constitutional.py` -- Constitutional mode test suite (14 tests)
 
 ### Modes
 - `demo` (default) -- All actions auto-approved
-- `clawshield` -- Requires signed approval artifact with hash binding, signature verification, tenant isolation, and expiry enforcement
+- `clawshield` -- Requires Ed25519-signed approval artifact with hash binding, expiry enforcement, signature verification, and tenant isolation
+
+### Env Vars
+- `OPENEXEC_MODE` -- demo or clawshield
+- `CLAWSHIELD_PUBLIC_KEY` -- PEM-encoded Ed25519 public key (clawshield mode)
+- `CLAWSHIELD_TENANT_ID` -- Tenant identifier (clawshield mode)
 
 ## User Preferences
 - GitHub as canonical source of truth
 - Every commit intentional, no drift
 - ClawHub-ready from day one
 - Infrastructure-first approach, not spec-only
+- No policy logic in OpenExec -- signature verification only
