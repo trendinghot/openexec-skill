@@ -1,6 +1,9 @@
 # OpenExec
 ### Deterministic Execution for AI Systems That Touch the Real World
 
+Every major AI execution breach in 2025 had one thing in common:
+the model was allowed to execute directly.
+
 If your AI can send emails, move money, delete data, or touch production --
 you need a hard boundary between **what it thinks** and **what it can execute**.
 
@@ -160,6 +163,35 @@ requests.post("http://localhost:5000/execute", json={
 ```
 
 In production, you enable strict mode.
+
+---
+
+## Wrapping OpenAI Tool Calls
+
+If your agent uses OpenAI function calling, route execution through OpenExec:
+
+```python
+import requests
+from datetime import datetime
+from uuid import uuid4
+
+tool_call = model_output["tool_calls"][0]
+
+response = requests.post(
+    "http://localhost:5000/execute",
+    json={
+        "action": tool_call["function"]["name"],
+        "payload": tool_call["function"]["arguments"],
+        "nonce": uuid4().hex
+    }
+)
+
+result = response.json()
+if not result.get("approved"):
+    raise Exception("Execution blocked by OpenExec")
+```
+
+That's it. Your agent proposes. OpenExec decides whether it runs.
 
 ---
 

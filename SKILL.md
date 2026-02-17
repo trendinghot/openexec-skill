@@ -1,7 +1,7 @@
 ---
 name: OpenExec
 slug: openexec
-version: 0.1.0
+version: 0.1.1
 category: infrastructure/governance/execution
 runtime: python
 entrypoint: main:app

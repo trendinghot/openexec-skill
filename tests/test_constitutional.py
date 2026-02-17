@@ -175,15 +175,32 @@ class TestHealthEndpoint(unittest.TestCase):
     def test_health_clawshield_mode(self):
         resp = client.get("/health")
         data = resp.json()
-        self.assertEqual(data["mode"], "clawshield")
+        self.assertEqual(data["exec_mode"], "clawshield")
         self.assertEqual(data["signature_verification"], "enabled")
 
     @patch.dict(os.environ, {"OPENEXEC_MODE": "demo"})
     def test_health_demo_mode(self):
         resp = client.get("/health")
         data = resp.json()
-        self.assertEqual(data["mode"], "demo")
+        self.assertEqual(data["exec_mode"], "demo")
         self.assertEqual(data["signature_verification"], "disabled")
+        self.assertEqual(data["restriction"], "open")
+        self.assertIn("warning", data)
+
+    @patch.dict(os.environ, {"OPENEXEC_ALLOWED_ACTIONS": "echo,add"})
+    def test_health_restricted_mode(self):
+        resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["restriction"], "restricted")
+        self.assertEqual(data["allow_list"], ["echo", "add"])
+        self.assertNotIn("warning", data)
+
+    def test_health_open_mode_warning(self):
+        os.environ.pop("OPENEXEC_ALLOWED_ACTIONS", None)
+        resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["restriction"], "open")
+        self.assertEqual(data["warning"], "No execution allow-list configured")
 
 if __name__ == "__main__":
     unittest.main()

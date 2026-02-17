@@ -9,7 +9,7 @@ from openexec.db import init_db
 import os
 import datetime
 
-VERSION = "0.3.0"
+VERSION = "0.1.1"
 
 @asynccontextmanager
 async def lifespan(application):
@@ -24,9 +24,26 @@ async def root():
 
 @app.get("/health")
 async def health():
-    mode = os.getenv("OPENEXEC_MODE", "demo")
-    sig_status = "enabled" if mode == "clawshield" else "disabled"
-    return {"status": "healthy", "mode": mode, "signature_verification": sig_status}
+    exec_mode = os.getenv("OPENEXEC_MODE", "demo")
+    sig_status = "enabled" if exec_mode == "clawshield" else "disabled"
+    allowed_actions = os.getenv("OPENEXEC_ALLOWED_ACTIONS", "")
+    if allowed_actions:
+        allow_list = [a.strip() for a in allowed_actions.split(",") if a.strip()]
+        restriction = "restricted"
+    else:
+        allow_list = None
+        restriction = "open"
+    result = {
+        "status": "healthy",
+        "exec_mode": exec_mode,
+        "signature_verification": sig_status,
+        "restriction": restriction,
+    }
+    if allow_list is not None:
+        result["allow_list"] = allow_list
+    else:
+        result["warning"] = "No execution allow-list configured"
+    return result
 
 @app.get("/version")
 def version():
