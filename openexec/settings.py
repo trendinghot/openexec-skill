@@ -1,9 +1,10 @@
 import os
 
-MODE = os.getenv("OPENEXEC_MODE", "demo")
+def get_mode():
+    return os.getenv("OPENEXEC_MODE", "demo")
 
 def is_demo():
-    return MODE == "demo"
+    return get_mode() == "demo"
 
 def is_clawshield():
-    return MODE == "clawshield"
+    return get_mode() == "clawshield"

@@ -3,9 +3,10 @@ import json
 import hashlib
 from openexec.registry import get_action
 from openexec.models import ExecutionRequest, ExecutionResult
-from openexec.settings import is_demo
+from openexec.settings import is_demo, is_clawshield
 from openexec.db import SessionLocal
 from openexec.tables import ExecutionLog
+from openexec.approval_validator import validate_approval, ApprovalError
 from sqlalchemy.exc import IntegrityError
 
 def execute(request: ExecutionRequest) -> ExecutionResult:
@@ -26,8 +27,14 @@ def execute(request: ExecutionRequest) -> ExecutionResult:
 
         if is_demo():
             approved = True
+        elif is_clawshield():
+            if not request.approval_artifact:
+                raise ApprovalError("ClawShield mode requires an approval artifact")
+            action_request = {"action": request.action, "payload": payload}
+            validate_approval(action_request, request.approval_artifact.model_dump())
+            approved = True
         else:
-            raise NotImplementedError("ClawShield mode not yet wired")
+            raise ValueError(f"Unknown mode")
 
         result = handler(payload)
         exec_id = str(uuid.uuid4())
