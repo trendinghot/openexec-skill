@@ -9,7 +9,7 @@ from openexec.db import init_db
 import os
 import datetime
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 @asynccontextmanager
 async def lifespan(application):

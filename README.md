@@ -193,6 +193,17 @@ Authority remains external to execution.
 ClawShield governance layer:
 [https://clawshield.forgerun.ai/](https://clawshield.forgerun.ai/)
 
+### Cryptographic Boundary
+
+In ClawShield mode:
+
+- Public key is loaded from `CLAWSHIELD_PUBLIC_KEY`
+- Signature verification is performed locally
+- No remote verification calls occur
+- The execution layer never contacts the governance service during runtime
+
+This preserves execution determinism and prevents network-induced variability.
+
 ---
 
 ## Optional: Execution Allow-List
@@ -216,16 +227,25 @@ If unset:
 ## Architecture
 
 ```
-Agent / Client
-        |
-        v
-     OpenExec  -- deterministic execution boundary
-        |
-        v
-   ClawShield -- approval issuance (optional SaaS)
-        |
-        v
-   ClawLedger -- receipt witness layer (optional)
+        Proposal Layer (LLM / Agent)
+                   |
+                   v
+        +------------------------+
+        |        OpenExec        |
+        |  Deterministic Boundary|
+        +------------------------+
+                   |
+                   v
+        +------------------------+
+        |     Governance Layer   |
+        |      (ClawShield)      |
+        +------------------------+
+                   |
+                   v
+        +------------------------+
+        |       Witness Layer    |
+        |      (ClawLedger)      |
+        +------------------------+
 ```
 
 Each layer is independently replaceable.
@@ -260,6 +280,66 @@ OpenExec assumes:
 - The proposal layer is untrusted
 - Governance decisions originate externally
 - Infrastructure isolation is handled separately
+
+---
+
+## Formal Guarantees
+
+OpenExec enforces the following properties:
+
+**Deterministic Execution**
+
+- For a given `(action, payload, nonce)` tuple, execution behavior and receipt hash are reproducible.
+- Identical inputs cannot produce divergent receipts.
+
+**Replay Protection**
+
+- Duplicate nonce submissions are rejected.
+- Prevents duplicate execution of the same request.
+
+**Cryptographic Approval Verification (ClawShield Mode)**
+
+- Approval artifacts must be signed using Ed25519.
+- Signature verification is performed offline.
+- Approval hash must match the execution request.
+- Expired approvals are rejected.
+- Tenant identifier must match the configured tenant.
+
+**No Outbound Network Calls During Execution**
+
+- Execution and signature verification occur fully offline.
+- No runtime HTTP calls are performed.
+
+**Receipt Integrity**
+
+- Every execution attempt emits a deterministic receipt.
+- Receipt verification recomputes hash to confirm integrity.
+- Receipts are tamper-evident.
+
+**Authority Separation**
+
+- Execution authority never originates from the execution layer.
+- Approval logic must exist externally.
+
+These guarantees are enforced by runtime logic, not policy heuristics.
+
+---
+
+## Determinism Definition
+
+Deterministic execution means:
+
+Given identical input parameters:
+
+- `action`
+- `payload`
+- `nonce`
+
+The execution path and receipt hash are fixed and reproducible.
+
+OpenExec does not rely on probabilistic evaluation, heuristic scoring, or model reasoning during execution.
+
+Execution behavior is fully defined by the registered handler and verified inputs.
 
 ---
 
@@ -304,6 +384,20 @@ This separation is deliberate.
 - Execution allow-list: supported
 - No outbound network calls during execution
 - No external dependencies required for local testing
+
+---
+
+## Security Properties Summary
+
+| Property | Enforced |
+|----------|----------|
+| Replay rejection | Yes |
+| Deterministic receipts | Yes |
+| Signature validation | Yes (ClawShield mode) |
+| Allow-list enforcement | Optional |
+| Outbound network calls during execution | None |
+| OS-level sandboxing | No (external responsibility) |
+| Policy decision engine | No (external responsibility) |
 
 ---
 
