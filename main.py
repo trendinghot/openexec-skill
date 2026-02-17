@@ -16,15 +16,12 @@ async def lifespan(application):
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
-def root():
-    return {"name": "OpenExec", "version": VERSION}
+async def root():
+    return {"service": "OpenExec", "status": "running", "version": VERSION}
 
 @app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "mode": os.getenv("OPENEXEC_MODE", "demo")
-    }
+async def health():
+    return {"status": "healthy", "mode": os.getenv("OPENEXEC_MODE", "demo")}
 
 @app.get("/version")
 def version():
