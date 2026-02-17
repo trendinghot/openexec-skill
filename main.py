@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from openexec.models import ExecutionRequest
+from openexec.receipts import verify_receipt
 from openexec.engine import execute
 from openexec.approval_validator import ApprovalError
 from openexec.db import init_db
@@ -46,3 +48,13 @@ def execute_action(request: ExecutionRequest):
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+class ReceiptVerifyRequest(BaseModel):
+    exec_id: str
+    result: str
+    receipt: str
+
+@app.post("/receipts/verify")
+def verify_receipt_endpoint(req: ReceiptVerifyRequest):
+    valid = verify_receipt(req.exec_id, req.result, req.receipt)
+    return {"valid": valid}

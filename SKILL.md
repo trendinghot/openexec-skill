@@ -1,94 +1,167 @@
 ---
 name: OpenExec
 slug: openexec
-version: 0.3.0
-category: infrastructure
-description: Deterministic execution engine requiring external governance approval with Ed25519 signature enforcement.
+version: 0.1.0
+category: infrastructure/governance/execution
 runtime: python
-entrypoint: main.py
+entrypoint: main:app
+requires_network: false
+modes:
+  - demo
+  - clawshield
 env:
   - OPENEXEC_MODE
   - CLAWSHIELD_PUBLIC_KEY
   - CLAWSHIELD_TENANT_ID
+  - CLAWSHIELD_BASE_URL
+description: Deterministic execution adapter that runs only with a signed approval artifact (ClawShield mode) and emits verifiable receipts.
 ---
 
-# OpenExec Skill
+# OpenExec — Governed Deterministic Execution (Skill)
 
-OpenExec is a deterministic execution engine that requires external governance approval before performing any action. In ClawShield mode, execution requires a cryptographically signed (Ed25519) approval artifact. Authority originates from ClawShield. OpenExec only verifies -- it never evaluates policy.
+OpenExec is a **runnable** governed execution service.  
+It executes **only** what has already been approved.
+
+It is not an agent.  
+It is not a policy engine.  
+It does not self-authorize.
+
+---
+
+## Install
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run (local)
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 5000
+```
+
+---
+
+## Endpoints
+
+* `GET /` → must return 200 quickly (deployment health check)
+* `GET /health` → health status
+* `GET /ready` → readiness checks
+* `GET /version` → version metadata
+* `POST /execute` → execute an approved action deterministically
+* `POST /receipts/verify` → verify receipt hash integrity
+
+---
 
 ## Modes
 
-### Demo (default)
-All actions are auto-approved. Zero friction for adoption and local development.
+### 1) Demo mode (default, free)
 
-### ClawShield (Ed25519 signature verified)
-Actions require a signed approval artifact issued by ClawShield. The engine validates:
-1. Canonical SHA-256 hash of the action request matches the artifact
-2. Ed25519 signature is authentic against the configured public key
-3. Approval has not expired (expires_at check)
-4. Tenant ID matches configuration
+No external governance required. Useful for indie hackers.
 
-No execution without externally minted authority. No live API calls. Fully offline verification.
-
-## Approval Artifact Format
-
-```json
-{
-  "approval_id": "uuid",
-  "tenant_id": "tenant-123",
-  "action_hash": "sha256-of-canonical-action-request",
-  "issued_at": "ISO-8601",
-  "expires_at": "ISO-8601",
-  "signature": "base64-ed25519-signature"
-}
+```bash
+export OPENEXEC_MODE=demo
 ```
 
-Signature is computed over:
+Demo mode still enforces:
+
+* deterministic execution
+* replay protection (nonce/action hash)
+* receipt generation
+
+### 2) ClawShield mode (production / business)
+
+Requires a **signed approval artifact** issued by ClawShield.
+OpenExec verifies the signature offline using the ClawShield public key.
+
+```bash
+export OPENEXEC_MODE=clawshield
+export CLAWSHIELD_PUBLIC_KEY="-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----"
+export CLAWSHIELD_TENANT_ID="tenant-id"
+export CLAWSHIELD_BASE_URL="https://clawshield.forgerun.ai"
 ```
-approval_id + tenant_id + action_hash + issued_at + expires_at
+
+If signature validation fails → execution is denied.
+
+---
+
+## 90-Second Quickstart (Demo)
+
+1. Start server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 5000
 ```
 
-Using Ed25519. OpenExec verifies with `CLAWSHIELD_PUBLIC_KEY`.
+2. Confirm health:
 
-## Actions
+```bash
+curl http://localhost:5000/health
+```
 
-Actions are registered in the action registry. Demo actions included:
+3. Execute a deterministic demo action:
 
-- `echo` -- Returns the payload back
-- `add` -- Adds two numbers (`a` and `b`)
+```bash
+curl -X POST http://localhost:5000/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action":"echo",
+    "payload":{"msg":"hello"},
+    "nonce":"unique-1"
+  }'
+```
 
-## Execution Flow
+4. Replay attempt (should return same result, not re-execute):
 
-### Demo Mode
-1. Client sends POST `/execute` with `action`, `payload`, and `nonce`
-2. Engine checks for replay (duplicate nonce)
-3. Action is auto-approved
-4. Handler executes deterministically
-5. Result is logged with SHA-256 receipt
+```bash
+curl -X POST http://localhost:5000/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action":"echo",
+    "payload":{"msg":"hello"},
+    "nonce":"unique-1"
+  }'
+```
 
-### ClawShield Mode
-1. Client sends POST `/execute` with `action`, `payload`, `nonce`, and `approval_artifact`
-2. Engine checks for replay (duplicate nonce)
-3. Engine validates approval artifact (hash, expiry, signature, tenant)
-4. If valid, handler executes deterministically
-5. Result is logged with SHA-256 receipt
-6. If invalid, returns 403 with specific rejection reason
+---
 
-## Replay Protection
+## Receipts
 
-Every execution requires a unique `nonce`. Duplicate nonces return the original result without re-execution.
+Every execution attempt produces a receipt hash.
+Receipts are **evidence**, not logs.
 
-## Receipt Verification
+Verify a receipt hash:
 
-Each execution produces a SHA-256 receipt derived from the execution ID and result. Receipts can be verified via `openexec.receipts.verify_receipt()`.
+```bash
+curl -X POST http://localhost:5000/receipts/verify \
+  -H "Content-Type: application/json" \
+  -d '{"exec_id":"<id>","result":"<result_json>","receipt":"<hash>"}'
+```
 
-## What OpenExec Does NOT Do
+---
 
-- Does not evaluate policy
-- Does not make live API calls during execution
-- Does not mint approvals
-- Does not manage tenants
-- Does not check revocation
-- Does not anchor to ledgers
+## What this skill does
 
-OpenExec is purely: deterministic execution + signature verification.
+* Accepts structured execution requests
+* Enforces replay protection
+* Executes deterministically (approved parameters only)
+* Emits verifiable receipts for every attempt
+* In ClawShield mode: verifies **signed approvals** before execution
+
+## What this skill does not do
+
+* Define policy
+* Grant permissions
+* Reason autonomously
+* Override governance decisions
+* Self-authorize execution
+
+---
+
+## Architecture context (3-layer separation)
+
+* **OpenExec** — deterministic execution adapter (this skill)
+* **ClawShield** — governance + approval minting (SaaS): [https://clawshield.forgerun.ai/](https://clawshield.forgerun.ai/)
+* **ClawLedger** — witness ledger (optional integration)
+
+Each layer is replaceable. No single layer can act alone.
