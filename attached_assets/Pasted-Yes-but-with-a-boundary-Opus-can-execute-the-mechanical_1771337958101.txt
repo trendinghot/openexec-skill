@@ -1,0 +1,223 @@
+Yes — but with a boundary.
+
+Opus can execute the **mechanical Git steps inside Replit**, but it cannot:
+
+* Log into your GitHub account outside Replit
+* Confirm repository visibility
+* Approve OAuth permissions
+* Decide release strategy
+
+So we’ll use Opus for the deterministic, mechanical Git operations — and you remain the authority for final push + verification.
+
+That keeps sovereignty intact.
+
+---
+
+# 🧠 What We Want Opus To Do
+
+We want Opus to:
+
+1. Amend the last commit message cleanly
+2. Verify branch and remote
+3. Ensure working tree is clean
+4. Push `main` to origin
+5. Tag `v0.1.0`
+6. Push tag
+7. Confirm push success
+
+No interpretation.
+No rewriting code.
+No architectural changes.
+Pure Git mechanics.
+
+---
+
+# 🔥 Give This Exact Prompt To Opus
+
+Copy this verbatim:
+
+---
+
+## 🔧 GIT CANONICALIZATION TASK — DO NOT MODIFY CODE
+
+We are finalizing OpenExec for canonical GitHub publication.
+
+You must perform the following Git operations inside the current repository.
+
+⚠️ Do NOT modify any source files.
+⚠️ Do NOT change code.
+⚠️ Only perform Git operations.
+⚠️ If a command fails, report exact error output.
+
+---
+
+### Step 1 — Verify Current Branch
+
+Run:
+
+```
+git branch
+```
+
+Confirm we are on `main`.
+
+If not, switch:
+
+```
+git checkout main
+```
+
+---
+
+### Step 2 — Amend Latest Commit Message
+
+Amend the most recent commit message to:
+
+```
+Finalize OpenExec constitutional execution engine with signed approval validation and replay protection
+```
+
+Use:
+
+```
+git commit --amend -m "Finalize OpenExec constitutional execution engine with signed approval validation and replay protection"
+```
+
+---
+
+### Step 3 — Verify Clean Working Tree
+
+Run:
+
+```
+git status
+```
+
+Confirm:
+
+* On branch main
+* Nothing to commit
+* Working tree clean
+
+---
+
+### Step 4 — Push Main Branch
+
+Run:
+
+```
+git push origin main
+```
+
+If force required due to amend, use:
+
+```
+git push origin main --force-with-lease
+```
+
+Only use force-with-lease if necessary.
+
+Report exact output.
+
+---
+
+### Step 5 — Create Version Tag
+
+Create tag:
+
+```
+git tag v0.1.0
+```
+
+Then push tag:
+
+```
+git push origin v0.1.0
+```
+
+---
+
+### Step 6 — Confirm Push
+
+Run:
+
+```
+git log --oneline -5
+git tag
+```
+
+Return output.
+
+Do not perform any other actions.
+
+---
+
+# 🧠 Why This Is Safe
+
+We are using:
+
+```
+--force-with-lease
+```
+
+NOT raw `--force`.
+
+That protects against overwriting remote unexpectedly.
+
+---
+
+# 🛑 What Opus Should NOT Do
+
+* Do not rebase
+* Do not squash
+* Do not alter history beyond amend
+* Do not rewrite files
+* Do not generate new commits
+* Do not touch secrets
+
+---
+
+# 🎯 After Opus Finishes
+
+You personally verify on:
+
+[https://github.com/trendinghot/openexec-skill](https://github.com/trendinghot/openexec-skill)
+
+Confirm:
+
+* Latest commit message clean
+* Files present
+* Tag visible
+
+Then we proceed to:
+
+ClawHub re-submission strategy.
+
+---
+
+# 🧠 One Important Question
+
+Before you run this:
+
+Do you want:
+
+* `v0.1.0` as initial constitutional release?
+* Or `v0.2.0` since signature layer was added?
+
+Technically, since this is the first constitutional release:
+
+I recommend:
+
+```
+v0.1.0
+```
+
+Keep semantic space for future enhancements.
+
+---
+
+Go ahead and give Opus that Git-only prompt.
+
+When it finishes, paste the terminal output here.
+
+We’ll audit it before moving forward.
