@@ -442,6 +442,27 @@ No external policy engine calls occur at runtime.
 
 ---
 
+## Security Model & Threat Boundaries
+
+OpenExec is an execution boundary -- not a sandbox.
+
+For a formal description of its security assumptions, threat model,
+network model, and production hardening checklist, see [SECURITY.md](SECURITY.md).
+
+Operators are responsible for:
+
+- Host isolation
+- Network exposure controls
+- TLS
+- Database trust configuration
+- Container or VM isolation
+- Action allow-list enforcement
+
+OpenExec enforces deterministic execution and approval integrity.
+Infrastructure isolation is intentionally externalized.
+
+---
+
 ## Security Properties Summary
 
 | Property | Enforced |

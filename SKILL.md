@@ -1,7 +1,7 @@
 ---
 name: OpenExec
 slug: openexec
-version: 0.1.7
+version: 0.1.8
 category: infrastructure/governance/execution
 runtime: python
 entrypoint: main:app
@@ -200,3 +200,15 @@ It is not a sandbox.
 * **ClawLedger** -- witness ledger (optional integration)
 
 Each layer is replaceable. No single layer can act alone.
+
+---
+
+## Security Documentation
+
+A full security model, threat assumptions, and production hardening
+checklist are available in [SECURITY.md](SECURITY.md).
+
+This skill intentionally separates:
+
+- Execution enforcement (OpenExec)
+- Infrastructure isolation (operator responsibility)
