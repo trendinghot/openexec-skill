@@ -17,7 +17,7 @@ env:
     - CLAWSHIELD_TENANT_ID
     - OPENEXEC_ALLOWED_ACTIONS
     - OPENEXEC_DB_URL
-description: Deterministic execution adapter that runs only with a signed approval artifact (ClawShield mode) and emits verifiable receipts. Performs no outbound network calls.
+description: Deterministic execution adapter that runs only with a signed approval artifact (ClawShield mode) and emits verifiable receipts. Performs no outbound HTTP or governance calls.
 ---
 
 # OpenExec — Governed Deterministic Execution (Skill)
@@ -29,7 +29,7 @@ It is not an agent.
 It is not a policy engine.
 It does not self-authorize.
 
-OpenExec performs **no outbound network calls** during signature verification or execution. All verification is fully offline.
+OpenExec performs **no outbound HTTP, RPC, or governance calls** during signature verification or execution. All verification is fully offline. By default, OpenExec uses a local SQLite database (`sqlite:///openexec.db`). Database network I/O occurs only if explicitly configured by the operator via `OPENEXEC_DB_URL`.
 
 ---
 
@@ -176,7 +176,7 @@ curl -X POST http://localhost:5000/receipts/verify \
 * Reason autonomously
 * Override governance decisions
 * Self-authorize execution
-* Make outbound network calls during execution
+* Make outbound HTTP or governance calls during execution
 * Provide OS-level sandboxing or container isolation
 
 ---

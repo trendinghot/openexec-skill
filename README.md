@@ -78,7 +78,7 @@ It does not:
 - Grant permissions
 - Provide OS/container sandboxing
 - Override governance decisions
-- Make outbound network calls during execution
+- Make outbound HTTP or governance calls during execution
 
 It executes only what has already been authorized.
 
@@ -186,7 +186,7 @@ In this mode:
 - Ed25519 signature must verify
 - Tenant must match
 - Expired approvals are rejected
-- No outbound network calls are performed during execution
+- No outbound HTTP or governance calls are performed during execution
 
 Authority remains external to execution.
 
@@ -305,10 +305,12 @@ OpenExec enforces the following properties:
 - Expired approvals are rejected.
 - Tenant identifier must match the configured tenant.
 
-**No Outbound Network Calls During Execution**
+**Network Isolation**
 
-- Execution and signature verification occur fully offline.
-- No runtime HTTP calls are performed.
+- OpenExec performs no outbound HTTP, RPC, or governance calls during execution.
+- Signature verification is performed locally using a pre-loaded public key.
+- By default, OpenExec uses a local SQLite database (`sqlite:///openexec.db`).
+- Database network I/O occurs only if explicitly configured by the operator via `OPENEXEC_DB_URL`.
 
 **Receipt Integrity**
 
@@ -382,7 +384,8 @@ This separation is deliberate.
 - Deterministic receipts: enforced
 - Ed25519 signature validation: implemented
 - Execution allow-list: supported
-- No outbound network calls during execution
+- No outbound HTTP or governance calls during execution
+- Database defaults to local SQLite; remote DB only if explicitly configured
 - No external dependencies required for local testing
 
 ---
@@ -395,7 +398,8 @@ This separation is deliberate.
 | Deterministic receipts | Yes |
 | Signature validation | Yes (ClawShield mode) |
 | Allow-list enforcement | Optional |
-| Outbound network calls during execution | None |
+| Outbound HTTP/governance calls during execution | None |
+| Database network I/O | Only if remote DB explicitly configured |
 | OS-level sandboxing | No (external responsibility) |
 | Policy decision engine | No (external responsibility) |
 
